@@ -1,5 +1,5 @@
-from graph import Graph
-from dijkstra import dijkstra
+from utils.graph import Graph
+from algorithms.dijkstra import dijkstra
 
 g = Graph()
 
@@ -13,3 +13,8 @@ result = dijkstra(g, 'A', 'D')
 
 print("Path:", result['path'])
 print("Distance:", result['distance'])
+
+from utils.path_converter import nodes_to_coordinates
+
+path = result['path']
+print(nodes_to_coordinates(path))

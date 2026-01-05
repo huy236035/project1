@@ -16,3 +16,11 @@ class Graph:
 
     def get_neighbors(self, node):
         return self.adj[node].items()
+
+    
+    def load_sample_data(self):
+        self.add_edge("A", "B", 2)
+        self.add_edge("A", "C", 5)
+        self.add_edge("B", "C", 1)
+        self.add_edge("B", "D", 4)
+        self.add_edge("C", "D", 2)
