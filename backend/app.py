@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from algorithms.dijkstra import dijkstra
+from algorithms.astar import astar
 from utils.graph import Graph
 from utils.path_converter import nodes_to_coordinates
 
@@ -17,7 +17,7 @@ def find_route():
     if not start or not end:
         return jsonify({"error": "missing start or end"}), 400
 
-    result = dijkstra(graph, start, end)
+    result = astar(graph, start, end)
     coords = nodes_to_coordinates(result["path"])
 
     return jsonify({
