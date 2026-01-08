@@ -1,29 +1,45 @@
-from flask import Flask, request, jsonify
-from algorithms.astar import astar
-from utils.graph import Graph
-from utils.path_converter import nodes_to_coordinates
+"""
+Flask application chính
+"""
+import sys
+import os
 
-app = Flask(__name__)
+# Thêm thư mục backend vào sys.path để absolute imports hoạt động
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
-# load graph (tạm hardcode, sau nâng cấp)
-graph = Graph()
-graph.load_sample_data()   # hoặc load từ OSM sau
+from flask import Flask
+from flask_cors import CORS
+from config import Config
+from api.routes import register_routes
+from utils.logger import logger
 
-@app.route("/route", methods=["GET"])
-def find_route():
-    start = request.args.get("start")
-    end = request.args.get("end")
-
-    if not start or not end:
-        return jsonify({"error": "missing start or end"}), 400
-
-    result = astar(graph, start, end)
-    coords = nodes_to_coordinates(result["path"])
-
-    return jsonify({
-        "distance": result["distance"],
-        "path": coords
-    })
+def create_app():
+    """
+    Tạo Flask app
+    
+    Returns:
+        Flask app instance
+    """
+    app = Flask(__name__)
+    
+    # CORS
+    CORS(app, origins=Config.CORS_ORIGINS)
+    
+    # Đăng ký routes
+    register_routes(app)
+    
+    # Health check endpoint
+    @app.route('/health', methods=['GET'])
+    def health():
+        return {'status': 'ok', 'service': 'route-finder'}, 200
+    
+    logger.info("Flask app initialized")
+    
+    return app
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app = create_app()
+    app.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT)
+
