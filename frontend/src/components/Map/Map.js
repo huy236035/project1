@@ -24,14 +24,18 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
-// Tạo custom icon với số thứ tự
+// Tạo icon marker 
 function createNumberedIcon(number) {
   return L.divIcon({
-    className: 'custom-numbered-marker',
-    html: `<div class="marker-number">${number}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-    popupAnchor: [0, -30],
+    className: '',
+    html: `
+      <div class="gm-marker">
+        <span>${number}</span>
+      </div>
+    `,
+    iconSize: [30, 42],      // ⚠️ chiều cao lớn hơn để có không gian cho phần nhọn dài
+    iconAnchor: [15, 42],    // mũi nhọn đúng tọa độ
+    popupAnchor: [0, -36],
   });
 }
 
@@ -44,23 +48,80 @@ function Map() {
   const [selectedPoints, setSelectedPoints] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [routePath, setRoutePath] = useState([]); // Đường đi từ backend
-  const [routeDistance, setRouteDistance] = useState(null); // Khoảng cách
+  const [routeDistance, setRouteDistance] = useState(null); // Khoảng cách tổng
+  const [routeLegs, setRouteLegs] = useState([]); // Chi tiết từng chặng đi
   const [isCalculating, setIsCalculating] = useState(false); // Đang tính toán
   const [routeError, setRouteError] = useState(null); // Lỗi khi tính route
   const mapRef = useRef(null);
 
+  // Hàm reverse geocoding để lấy địa chỉ từ tọa độ
+  const reverseGeocode = useCallback(async (lat, lng) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=vi`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'TSP Route Finder' // Nominatim yêu cầu User-Agent
+        }
+      });
+      const data = await response.json();
+      
+      if (data && data.address) {
+        const addr = data.address;
+        const parts = [];
+        
+        // Số nhà
+        if (addr.house_number) parts.push(addr.house_number);
+        // Tên đường/phố
+        if (addr.road || addr.street) parts.push(addr.road || addr.street);
+        // Phường
+        if (addr.suburb || addr.ward) parts.push(addr.suburb || addr.ward);
+        // Quận/Huyện
+        if (addr.city_district || addr.district) parts.push(addr.city_district || addr.district);
+        // Quận (nếu có)
+        if (addr.county && !addr.city_district) parts.push(addr.county);
+        // Thành phố
+        if (addr.city || addr.town) parts.push(addr.city || addr.town);
+        
+        if (parts.length > 0) {
+          return parts.join(', ');
+        }
+      }
+      
+      return data.display_name || 'Không xác định được địa chỉ';
+    } catch (error) {
+      console.error('Error reverse geocoding:', error);
+      return 'Không xác định được địa chỉ';
+    }
+  }, []);
+
   // Xử lý khi click trên map
-  const handleMapClick = useCallback((lat, lng) => {
+  const handleMapClick = useCallback(async (lat, lng) => {
+    const newPointId = Date.now() + Math.random();
+    
+    // Thêm điểm với địa chỉ đang load
     setSelectedPoints((prevPoints) => {
       const newPoint = {
-        id: Date.now() + Math.random(), // ID unique dựa trên timestamp
+        id: newPointId,
         lat: lat,
         lng: lng,
         number: prevPoints.length + 1,
+        address: 'Đang tải địa chỉ...',
       };
       return [...prevPoints, newPoint];
     });
-  }, []);
+    
+    // Lấy địa chỉ
+    const address = await reverseGeocode(lat, lng);
+    
+    // Cập nhật địa chỉ cho điểm vừa thêm
+    setSelectedPoints((prevPoints) => 
+      prevPoints.map(point => 
+        point.id === newPointId 
+          ? { ...point, address } 
+          : point
+      )
+    );
+  }, [reverseGeocode]);
 
   // Reset isDeleting flag sau khi state đã update
   useEffect(() => {
@@ -96,6 +157,7 @@ function Map() {
     setSelectedPoints([]);
     setRoutePath([]);
     setRouteDistance(null);
+    setRouteLegs([]);
     setRouteError(null);
   }, [isDeleting]);
 
@@ -121,6 +183,7 @@ function Map() {
     setRouteError(null);
     setRoutePath([]);
     setRouteDistance(null);
+    setRouteLegs([]);
 
     try {
       // Bước 1: Gửi request lên backend để tìm thứ tự tối ưu
@@ -140,6 +203,7 @@ function Map() {
       
       // Bước 3: Gọi OSM Routing API cho từng cặp điểm liên tiếp
       const allPaths = []; // Mảng chứa các đường đi chi tiết
+      const legs = []; // Mảng chứa thông tin từng chặng đi
       let totalDistance = 0;
       
       for (let i = 0; i < routeIndices.length - 1; i++) {
@@ -161,16 +225,43 @@ function Map() {
             const distanceKm = (route.distance / 1000).toFixed(2);
             totalDistance += parseFloat(distanceKm);
             
+            // Lưu thông tin chặng đi
+            legs.push({
+              from: fromIdx + 1, // Số thứ tự điểm bắt đầu (1-indexed)
+              to: toIdx + 1, // Số thứ tự điểm kết thúc (1-indexed)
+              distance: parseFloat(distanceKm)
+            });
+            
             // Chuyển đổi coordinates: [lng, lat] -> [lat, lng] cho Leaflet
             const geometry = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
             allPaths.push(geometry);
           } else {
             // Fallback: đường thẳng nếu không tìm thấy route
+            const fallbackDistance = parseFloat((Math.sqrt(
+              Math.pow((toPoint.lat - fromPoint.lat) * 111, 2) + 
+              Math.pow((toPoint.lng - fromPoint.lng) * 111 * Math.cos(fromPoint.lat * Math.PI / 180), 2)
+            )).toFixed(2));
+            totalDistance += fallbackDistance;
+            legs.push({
+              from: fromIdx + 1,
+              to: toIdx + 1,
+              distance: fallbackDistance
+            });
             allPaths.push([[fromPoint.lat, fromPoint.lng], [toPoint.lat, toPoint.lng]]);
           }
         } catch (err) {
           console.warn(`Error fetching route from OSM for segment ${i}:`, err);
           // Fallback: đường thẳng
+          const fallbackDistance = parseFloat((Math.sqrt(
+            Math.pow((toPoint.lat - fromPoint.lat) * 111, 2) + 
+            Math.pow((toPoint.lng - fromPoint.lng) * 111 * Math.cos(fromPoint.lat * Math.PI / 180), 2)
+          )).toFixed(2));
+          totalDistance += fallbackDistance;
+          legs.push({
+            from: fromIdx + 1,
+            to: toIdx + 1,
+            distance: fallbackDistance
+          });
           allPaths.push([[fromPoint.lat, fromPoint.lng], [toPoint.lat, toPoint.lng]]);
         }
       }
@@ -178,6 +269,7 @@ function Map() {
       // Bước 4: Lưu kết quả và vẽ lên map
       setRoutePath(allPaths); // Mảng các đường đi (mỗi phần tử là một Polyline)
       setRouteDistance(totalDistance.toFixed(2));
+      setRouteLegs(legs); // Lưu thông tin từng chặng đi
 
       // Fit map để hiển thị toàn bộ route
       if (mapRef.current && allPaths.length > 0) {
@@ -194,6 +286,7 @@ function Map() {
       setRouteError(error.message || 'Có lỗi xảy ra khi tìm đường');
       setRoutePath([]);
       setRouteDistance(null);
+      setRouteLegs([]);
     } finally {
       setIsCalculating(false);
     }
@@ -232,9 +325,18 @@ function Map() {
             )}
           </div>
         </div>
-        {routeDistance !== null && (
+        {routeDistance !== null && routeLegs.length > 0 && (
           <div className="route-info">
-            <strong>Khoảng cách: {routeDistance} km</strong>
+            <div className="route-legs">
+              {routeLegs.map((leg, index) => (
+                <div key={index} className="route-leg-item">
+                  Chặng {index + 1} ({leg.from}-{leg.to}): <strong>{leg.distance.toFixed(2)} km</strong>
+                </div>
+              ))}
+            </div>
+            <div className="route-total">
+              <strong>Tổng: {routeDistance} km</strong>
+            </div>
           </div>
         )}
         {routeError && (
@@ -244,13 +346,25 @@ function Map() {
         )}
         <div className="points-list">
           {selectedPoints.length === 0 ? (
-            <p className="empty-message">Chưa có điểm nào. Click trên bản đồ để chọn điểm.</p>
+            <div className="empty-message">
+              <p>Chưa có điểm nào. Click trên bản đồ để chọn điểm.</p>
+              <div style={{ marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#555' }}>
+                <p><strong>Hướng dẫn sử dụng:</strong></p>
+                <ol style={{ paddingLeft: '18px', margin: 0 }}>
+                  <li>Click vào bản đồ để chọn các điểm cần đi qua (điểm 1, 2, 3,...).</li>
+                  <li>Hệ thống sẽ luôn <strong>bắt đầu từ điểm 1</strong> và đi qua tất cả các điểm còn lại sao cho <strong>tổng quãng đường ngắn nhất</strong>.</li>
+                  <li>Nhấn nút <strong>"Tìm đường"</strong> để hệ thống tính toán lộ trình tối ưu.</li>
+                  <li>Quan sát đường đi màu xanh trên bản đồ và danh sách các chặng ở bên trái.</li>
+                  <li>Nếu muốn làm lại, nhấn <strong>"Xóa tất cả"</strong> để chọn điểm mới.</li>
+                </ol>
+              </div>
+            </div>
           ) : (
             selectedPoints.map((point) => (
               <div key={point.id} className="point-item">
                 <span className="point-number">{point.number}</span>
-                <span className="point-coords">
-                  {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                <span className="point-address">
+                  {point.address || 'Đang tải địa chỉ...'}
                 </span>
                 <button 
                   className="remove-btn"
@@ -283,9 +397,9 @@ function Map() {
           <Polyline
             key={`route-${idx}`}
             positions={path}
-            color="#3498db"
-            weight={4}
-            opacity={0.7}
+            color="#1a73e8"
+            weight={5}
+            opacity={0.9}
           />
         ))}
         {selectedPoints.map((point) => (
@@ -297,10 +411,12 @@ function Map() {
             <Popup>
               <div>
                 <strong>Điểm {point.number}</strong>
-                <br />
-                Lat: {point.lat.toFixed(6)}
-                <br />
-                Lng: {point.lng.toFixed(6)}
+                {point.address && (
+                  <>
+                    <br />
+                    {point.address}
+                  </>
+                )}
               </div>
             </Popup>
           </Marker>

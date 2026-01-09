@@ -79,7 +79,44 @@
   background: #d4edda;
   border-bottom: 1px solid #c3e6cb;
   color: #155724;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+.route-info > div {
+  font-size: 13px;
+}
+
+.route-legs {
+  max-height: 150px;     /* chỉ phần danh sách chặng được cuộn */
+  overflow-y: auto;
+  padding-right: 4px;    /* tránh che bởi scrollbar */
+}
+
+.route-leg-item {
+  margin-bottom: 5px;
+}
+
+.route-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #c3e6cb;
+}
+
+/* Scrollbar cho phần kết quả chặng - trong suốt ~70% */
+.route-legs::-webkit-scrollbar {
+  width: 6px;
+}
+
+.route-legs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.route-legs::-webkit-scrollbar-thumb {
+  background-color: rgba(21, 87, 36, 0.7); /* xanh đậm, 70% opacity */
+  border-radius: 3px;
 }
 
 .route-error {
@@ -134,11 +171,11 @@
   flex-shrink: 0;
 }
 
-.point-coords {
+.point-address {
   flex: 1;
-  font-size: 12px;
-  color: #555;
-  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #333;
+  line-height: 1.4;
 }
 
 .remove-btn {
@@ -167,25 +204,27 @@
   cursor: not-allowed;
 }
 
-/* Custom numbered marker */
-.custom-numbered-marker {
-  background: transparent;
-  border: none;
+.gm-marker {
+  position: relative;
+  width: 30px;
+  height: 30px; /* Giữ phần tròn vuông để không bị méo */
+  background: #1a73e8;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  overflow: visible; /* Cho phép phần nhọn hiển thị */
 }
 
-.marker-number {
-  width: 30px;
-  height: 30px;
-  background: #3498db;
-  color: white;
-  border-radius: 50%;
+.gm-marker span {
+  position: absolute;
+  inset: 0;
+  transform: rotate(45deg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  font-size: 14px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  border: 2px solid white;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 /* Leaflet map container */
