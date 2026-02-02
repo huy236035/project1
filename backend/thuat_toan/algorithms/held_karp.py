@@ -1,6 +1,10 @@
+
 import itertools
 
 def held_karp(matrix):
+    """
+    Thuật toán Held-Karp
+    """
     n = len(matrix)
     
     C = {}
@@ -45,6 +49,7 @@ def held_karp(matrix):
                 last_node = k
                 
     if last_node == -1:
+        # Trường hợp không tìm thấy đường đi
         return {'route': list(range(n)), 'distance': 0}
         
     path = []
