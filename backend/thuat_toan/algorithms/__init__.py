@@ -1,9 +1,5 @@
-"""
-Thuật toán tìm đường đi
-"""
-from thuat_toan.algorithms.astar import astar
 from thuat_toan.algorithms.genetic_algorithm import genetic_algorithm
-from thuat_toan.algorithms.dijkstra import dijkstra
+from thuat_toan.algorithms.held_karp import held_karp
 
-__all__ = ['astar', 'genetic_algorithm', 'dijkstra']
+__all__ = ['genetic_algorithm', 'held_karp']
 

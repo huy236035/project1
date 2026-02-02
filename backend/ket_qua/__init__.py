@@ -1,4 +1,0 @@
-"""
-Kết quả và Response
-"""
-

@@ -1,6 +1,3 @@
-/**
- * API Service - Xử lý các request đến Backend
- */
 import API_CONFIG from '../config/api';
 
 class ApiService {
@@ -9,16 +6,10 @@ class ApiService {
     this.timeout = API_CONFIG.TIMEOUT;
   }
 
-  /**
-   * Tạo full URL từ endpoint
-   */
   getFullUrl(endpoint) {
     return `${this.baseURL}${endpoint}`;
   }
 
-  /**
-   * Xử lý response
-   */
   async handleResponse(response) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({
@@ -28,8 +19,7 @@ class ApiService {
     }
 
     const data = await response.json();
-    
-    // Kiểm tra success flag
+
     if (data.success === false) {
       throw new Error(data.error || 'Có lỗi xảy ra');
     }
@@ -37,13 +27,10 @@ class ApiService {
     return data;
   }
 
-  /**
-   * Tìm đường đi giữa 2 điểm
-   */
   async findRoute(start, end) {
     const url = this.getFullUrl(API_CONFIG.ENDPOINTS.ROUTE);
     const params = new URLSearchParams({ start, end });
-    
+
     const response = await fetch(`${url}?${params}`, {
       ...API_CONFIG.DEFAULT_OPTIONS,
       method: 'GET',
@@ -52,12 +39,9 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  /**
-   * Tìm route tối ưu đi qua nhiều điểm
-   */
   async findMultiRoute(points, options = {}) {
     const url = this.getFullUrl(API_CONFIG.ENDPOINTS.MULTI_ROUTE);
-    
+
     const requestBody = {
       points: points.map(point => ({
         lat: point.lat,
@@ -90,21 +74,18 @@ class ApiService {
     }
   }
 
-  /**
-   * Kiểm tra health của backend
-   */
   async checkHealth() {
     const url = this.getFullUrl(API_CONFIG.ENDPOINTS.HEALTH);
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
@@ -113,6 +94,4 @@ class ApiService {
   }
 }
 
-// Export singleton instance
 export default new ApiService();
-

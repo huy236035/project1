@@ -1,65 +1,20 @@
-"""
-Validate dữ liệu đầu vào
-"""
-from __future__ import annotations
-from typing import List, Dict, Any
-
-class DataValidator:
-    """
-    Validate dữ liệu đầu vào
-    """
-    
-    @staticmethod
-    def validate_coordinates(coordinates: List[Dict[str, float]]) -> tuple[bool, str]:
-        """
-        Validate danh sách tọa độ
+def validate_coordinates(points):
+    if not points or not isinstance(points, list):
+        return False, "Dữ liệu không hợp lệ: 'points' phải là một danh sách."
         
-        Args:
-            coordinates: List các dict chứa lat, lng
+    if len(points) < 2:
+        return False, "Cần ít nhất 2 điểm để tìm đường."
         
-        Returns:
-            (is_valid, error_message)
-        """
-        if not coordinates:
-            return False, "Danh sách tọa độ không được rỗng"
-        
-        if len(coordinates) < 2:
-            return False, "Cần ít nhất 2 điểm"
-        
-        for i, coord in enumerate(coordinates):
-            if 'lat' not in coord or 'lng' not in coord:
-                return False, f"Điểm {i+1} thiếu lat hoặc lng"
+    for i, point in enumerate(points):
+        if not isinstance(point, dict) or 'lat' not in point or 'lng' not in point:
+            return False, f"Điểm thứ {i+1} không đúng định dạng."
             
-            lat = coord['lat']
-            lng = coord['lng']
+        try:
+            lat = float(point['lat'])
+            lng = float(point['lng'])
+            if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+                return False, f"Tọa độ điểm thứ {i+1} không hợp lệ."
+        except ValueError:
+            return False, f"Tọa độ điểm thứ {i+1} phải là số."
             
-            if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
-                return False, f"Điểm {i+1}: lat và lng phải là số"
-            
-            if not (-90 <= lat <= 90):
-                return False, f"Điểm {i+1}: lat phải trong khoảng [-90, 90]"
-            
-            if not (-180 <= lng <= 180):
-                return False, f"Điểm {i+1}: lng phải trong khoảng [-180, 180]"
-        
-        return True, ""
-    
-    @staticmethod
-    def validate_location_data(data: Dict[str, Any]) -> tuple[bool, str]:
-        """
-        Validate dữ liệu địa điểm
-        
-        Args:
-            data: Dict chứa thông tin địa điểm
-        
-        Returns:
-            (is_valid, error_message)
-        """
-        required_fields = ['lat', 'lng']
-        
-        for field in required_fields:
-            if field not in data:
-                return False, f"Thiếu trường bắt buộc: {field}"
-        
-        return DataValidator.validate_coordinates([data])
-
+    return True, ""
